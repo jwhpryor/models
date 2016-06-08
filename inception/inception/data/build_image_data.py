@@ -72,6 +72,7 @@ import random
 import sys
 import threading
 
+import kg_data
 
 import numpy as np
 import tensorflow as tf
@@ -83,12 +84,12 @@ tf.app.flags.DEFINE_string('validation_directory', '/tmp/',
 tf.app.flags.DEFINE_string('output_directory', '/tmp/',
                            'Output data directory')
 
-tf.app.flags.DEFINE_integer('train_shards', 2,
+tf.app.flags.DEFINE_integer('train_shards', 16,
                             'Number of shards in training TFRecord files.')
-tf.app.flags.DEFINE_integer('validation_shards', 2,
+tf.app.flags.DEFINE_integer('validation_shards', 16,
                             'Number of shards in validation TFRecord files.')
 
-tf.app.flags.DEFINE_integer('num_threads', 2,
+tf.app.flags.DEFINE_integer('num_threads', 16,
                             'Number of threads to preprocess the images.')
 
 # The labels file contains a list of valid labels are held in this file.
@@ -419,12 +420,13 @@ def main(unused_argv):
       'FLAGS.validation_shards')
   print('Saving results to %s' % FLAGS.output_directory)
 
-  # Run it!
-  _process_dataset('validation', FLAGS.validation_directory,
-                   FLAGS.validation_shards, FLAGS.labels_file)
-  _process_dataset('train', FLAGS.train_directory,
-                   FLAGS.train_shards, FLAGS.labels_file)
+  train_filenames, train_labels = kg_data.get_train_eval_and_label(train=True)
+  train_texts = ['c'+str(x) for x in train_labels]
+  _process_image_files('train', train_filenames, train_texts, train_labels, FLAGS.train_shards)
 
+  validation_filenames, validation_labels = kg_data.get_train_eval_and_label(train=True)
+  validation_texts = ['c'+str(x) for x in validation_labels]
+  _process_image_files('validation', validation_filenames, validation_texts, validation_labels, FLAGS.validation_shards)
 
 if __name__ == '__main__':
   tf.app.run()
