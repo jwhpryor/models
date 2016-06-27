@@ -44,14 +44,14 @@ import tensorflow as tf
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_integer('batch_size', 128,
+tf.app.flags.DEFINE_integer('batch_size', 1,
                             """Number of images to process in a batch.""")
 tf.app.flags.DEFINE_integer('image_size', 299,
                             """Provide square images of this size.""")
 tf.app.flags.DEFINE_integer('num_preprocess_threads', 4,
                             """Number of preprocessing threads per tower. """
                             """Please make this a multiple of 4.""")
-tf.app.flags.DEFINE_integer('num_readers', 4,
+tf.app.flags.DEFINE_integer('num_readers', 1,
                             """Number of parallel readers during train.""")
 
 # Images are preprocessed asynchronously using multiple threads specified by
@@ -64,7 +64,7 @@ tf.app.flags.DEFINE_integer('num_readers', 4,
 # of 1024*16 images. Assuming RGB 299x299 images, this implies a queue size of
 # 16GB. If the machine is memory limited, then decrease this factor to
 # decrease the CPU memory footprint, accordingly.
-tf.app.flags.DEFINE_integer('input_queue_memory_factor', 16,
+tf.app.flags.DEFINE_integer('input_queue_memory_factor', 4,
                             """Size of the queue of preprocessed images. """
                             """Default is ideal but try smaller values, e.g. """
                             """4, 2 or 1, if host memory is constrained. See """

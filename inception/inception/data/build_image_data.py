@@ -73,23 +73,24 @@ import sys
 import threading
 
 import kg_data
+from inception import image_processing
 
 import numpy as np
 import tensorflow as tf
 
-tf.app.flags.DEFINE_string('train_directory', '/tmp/',
+tf.app.flags.DEFINE_string('train_directory', '/tmp',
                            'Training data directory')
-tf.app.flags.DEFINE_string('validation_directory', '/tmp/',
+tf.app.flags.DEFINE_string('validation_directory', '/tmp',
                            'Validation data directory')
-tf.app.flags.DEFINE_string('output_directory', '/tmp/',
+tf.app.flags.DEFINE_string('output_directory', '/tmp/kg_protobufs',
                            'Output data directory')
 
-tf.app.flags.DEFINE_integer('train_shards', 16,
+tf.app.flags.DEFINE_integer('train_shards', 4,
                             'Number of shards in training TFRecord files.')
-tf.app.flags.DEFINE_integer('validation_shards', 16,
+tf.app.flags.DEFINE_integer('validation_shards', 4,
                             'Number of shards in validation TFRecord files.')
 
-tf.app.flags.DEFINE_integer('num_threads', 16,
+tf.app.flags.DEFINE_integer('num_threads', 4,
                             'Number of threads to preprocess the images.')
 
 # The labels file contains a list of valid labels are held in this file.
@@ -163,6 +164,13 @@ class ImageCoder(object):
     # Initializes function that decodes RGB JPEG data.
     self._decode_jpeg_data = tf.placeholder(dtype=tf.string)
     self._decode_jpeg = tf.image.decode_jpeg(self._decode_jpeg_data, channels=3)
+
+    # force size to ImageNet compatible sizing
+    # (all the reshaping is because re-size bicubic expects a batch tensor)
+    self._decode_jpeg.set_shape((kg_data.KG_IMAGE_WIDTH, kg_data.KG_IMAGE_HEIGHT, 3))
+    self._decode_jpeg = tf.reshape(self._decode_jpeg, [1, kg_data.KG_IMAGE_WIDTH, kg_data.KG_IMAGE_HEIGHT, 3])
+    self._decode_jpeg = tf.image.resize_bicubic(self._decode_jpeg, [299, 299])
+    self._decode_jpeg = tf.reshape(self._decode_jpeg, [299, 299, 3])
 
   def png_to_jpeg(self, image_data):
     return self._sess.run(self._png_to_jpeg,
@@ -424,7 +432,7 @@ def main(unused_argv):
   train_texts = ['c'+str(x) for x in train_labels]
   _process_image_files('train', train_filenames, train_texts, train_labels, FLAGS.train_shards)
 
-  validation_filenames, validation_labels = kg_data.get_train_eval_and_label(train=True)
+  validation_filenames, validation_labels = kg_data.get_train_eval_and_label(train=False)
   validation_texts = ['c'+str(x) for x in validation_labels]
   _process_image_files('validation', validation_filenames, validation_texts, validation_labels, FLAGS.validation_shards)
 

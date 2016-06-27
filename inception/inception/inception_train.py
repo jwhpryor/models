@@ -42,7 +42,7 @@ tf.app.flags.DEFINE_string('subset', 'train',
                            """Either 'train' or 'validation'.""")
 
 # Flags governing the hardware employed for running TensorFlow.
-tf.app.flags.DEFINE_integer('num_gpus', 1,
+tf.app.flags.DEFINE_integer('num_gpus', 4,
                             """How many GPUs to use.""")
 tf.app.flags.DEFINE_boolean('log_device_placement', False,
                             """Whether to log device placement.""")

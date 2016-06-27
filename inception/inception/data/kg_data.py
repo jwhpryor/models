@@ -7,26 +7,24 @@ import csv
 import tensorflow as tf
 import numpy as np
 
-np.random.seed(0xabcdef)
+from inception import image_processing
 
-FLAGS = tf.app.flags.FLAGS
+np.random.seed(0xabcdef)
 
 tf.app.flags.DEFINE_string('label_dictionary', 'data/imgs/driver_imgs_list.csv',
                            """Dictionary of all filenames and their respective class info""")
-'''
-tf.app.flags.DEFINE_string('train_dir', 'data/imgs/train',
-                           """Images train dir""")
-tf.app.flags.DEFINE_string('eval_imgs_dir', 'data/imgs/test',
-                           """Images train dir""")
-                           '''
 tf.app.flags.DEFINE_float('holdout', 0.1,
                           """Percent of samples to holdout.""")
 
+FLAGS = tf.app.flags.FLAGS
+
 # Make all of our sets nicely fit to the batch size
 # (possibly losing a few samples)
-BATCH_SIZE = 128
+BATCH_SIZE = FLAGS.batch_size
 HOLDOUT = 0.1
 TOTAL_SAMPLES = 22424
+KG_IMAGE_WIDTH = 640
+KG_IMAGE_HEIGHT = 480
 NUM_TRAIN_SAMPLES = int(TOTAL_SAMPLES * (1-HOLDOUT))
 NUM_TRAIN_SAMPLES -= NUM_TRAIN_SAMPLES % BATCH_SIZE
 NUM_EVAL_SAMPLES = (TOTAL_SAMPLES - NUM_TRAIN_SAMPLES)
