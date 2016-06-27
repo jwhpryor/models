@@ -31,7 +31,7 @@ class FlowersData(Dataset):
 
   def num_classes(self):
     """Returns the number of classes in the data set."""
-    return 5
+    return 10
 
   def num_examples_per_epoch(self):
     """Returns the number of examples in the data subset."""

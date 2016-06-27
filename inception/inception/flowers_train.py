@@ -27,7 +27,6 @@ from inception.flowers_data import FlowersData
 
 FLAGS = tf.app.flags.FLAGS
 
-
 def main(_):
   dataset = FlowersData(subset=FLAGS.subset)
   assert dataset.data_files()
