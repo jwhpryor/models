@@ -89,6 +89,8 @@ tf.app.flags.DEFINE_integer('train_shards', 4,
                             'Number of shards in training TFRecord files.')
 tf.app.flags.DEFINE_integer('validation_shards', 4,
                             'Number of shards in validation TFRecord files.')
+tf.app.flags.DEFINE_integer('predict_shards', 4,
+                            'Number of shards in prediction TFRecord files.')
 
 tf.app.flags.DEFINE_integer('num_threads', 4,
                             'Number of threads to preprocess the images.')
@@ -420,7 +422,7 @@ def _process_dataset(name, directory, num_shards, labels_file):
   _process_image_files(name, filenames, texts, labels, num_shards)
 
 
-def main(unused_argv):
+def main_old(unused_argv):
   assert not FLAGS.train_shards % FLAGS.num_threads, (
       'Please make the FLAGS.num_threads commensurate with FLAGS.train_shards')
   assert not FLAGS.validation_shards % FLAGS.num_threads, (
@@ -435,6 +437,19 @@ def main(unused_argv):
   validation_filenames, validation_labels = kg_data.get_train_eval_and_label(train=False)
   validation_texts = ['c'+str(x) for x in validation_labels]
   _process_image_files('validation', validation_filenames, validation_texts, validation_labels, FLAGS.validation_shards)
+
+def main(unused_argv):
+  assert not FLAGS.train_shards % FLAGS.num_threads, (
+    'Please make the FLAGS.num_threads commensurate with FLAGS.train_shards')
+  assert not FLAGS.validation_shards % FLAGS.num_threads, (
+    'Please make the FLAGS.num_threads commensurate with '
+    'FLAGS.validation_shards')
+  print('Saving results to %s' % FLAGS.output_directory)
+
+  predict_filenames = kg_data.get_predict_sets()
+  predict_labels = [0 for x in predict_filenames]   # what do i do?
+  predict_texts = [x for x in predict_filenames]
+  _process_image_files('predict', predict_filenames, predict_texts, predict_labels, FLAGS.predict_shards)
 
 if __name__ == '__main__':
   tf.app.run()

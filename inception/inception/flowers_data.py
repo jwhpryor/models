@@ -18,8 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from inception import kg_data
 from inception.dataset import Dataset
-from inception.data import kg_data
 
 class FlowersData(Dataset):
   """Flowers data set."""
@@ -37,6 +37,8 @@ class FlowersData(Dataset):
       return kg_data.NUM_TRAIN_SAMPLES
     if self.subset == 'validation':
       return kg_data.NUM_EVAL_SAMPLES
+    if self.subset == 'predict':
+      return kg_data.NUM_PREDICT_SAMPLES
 
   def download_message(self):
     """Instruction to download and extract the tarball from Flowers website."""

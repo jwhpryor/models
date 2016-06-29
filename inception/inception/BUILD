@@ -13,6 +13,13 @@ package_group(
 )
 
 py_library(
+    name = "kg_data",
+    srcs = [
+        "kg_data.py",
+    ],
+)
+
+py_library(
     name = "dataset",
     srcs = [
         "dataset.py",
@@ -54,6 +61,8 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         ":dataset",
+        ":kg_data",
+	":imagenet_data",
         "//inception/slim",
     ],
 )

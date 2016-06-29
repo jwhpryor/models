@@ -11,6 +11,8 @@ from inception import image_processing
 
 np.random.seed(0xabcdef)
 
+tf.app.flags.DEFINE_string('predict_data_dir', 'training_data/imgs/test/',
+                           """Dictionary of all filenames and their respective class info""")
 tf.app.flags.DEFINE_string('label_dictionary', 'data/imgs/driver_imgs_list.csv',
                            """Dictionary of all filenames and their respective class info""")
 tf.app.flags.DEFINE_float('holdout', 0.1,
@@ -29,6 +31,9 @@ NUM_TRAIN_SAMPLES = int(TOTAL_SAMPLES * (1-HOLDOUT))
 NUM_TRAIN_SAMPLES -= NUM_TRAIN_SAMPLES % BATCH_SIZE
 NUM_EVAL_SAMPLES = (TOTAL_SAMPLES - NUM_TRAIN_SAMPLES)
 NUM_EVAL_SAMPLES -= NUM_EVAL_SAMPLES % BATCH_SIZE
+
+# kg predictions
+NUM_PREDICT_SAMPLES = 79726
 
 class DriverRecord:
     def __init__(self, filename, driver_id, class_id):
@@ -79,3 +84,10 @@ def get_train_eval_sets(holdout=HOLDOUT):
     np.random.shuffle(filenames)
 
     return filenames[0:NUM_TRAIN_SAMPLES], filenames[-NUM_EVAL_SAMPLES:]
+
+def get_predict_sets():
+    full_path = os.path.join(os.getcwd(), FLAGS.predict_data_dir)
+    filenames = [os.path.join(full_path, x) for x in os.listdir(full_path)]
+
+    assert(len(filenames) == NUM_PREDICT_SAMPLES)
+    return filenames

@@ -26,7 +26,6 @@ from inception.flowers_data import FlowersData
 
 FLAGS = tf.app.flags.FLAGS
 
-
 def main(unused_argv=None):
   dataset = FlowersData(subset=FLAGS.subset)
   assert dataset.data_files()
@@ -35,6 +34,13 @@ def main(unused_argv=None):
   tf.gfile.MakeDirs(FLAGS.eval_dir)
   inception_eval.evaluate(dataset)
 
+def main_predict(unused_argv=None):
+  dataset = FlowersData(subset='predict')
+  #assert dataset.data_files()                   no analog?
+  if tf.gfile.Exists(FLAGS.predict_dir):
+    tf.gfile.DeleteRecursively(FLAGS.predict_dir)
+  tf.gfile.MakeDirs(FLAGS.predict_dir)
+  inception_eval.predict(dataset)
 
 if __name__ == '__main__':
   tf.app.run()

@@ -71,7 +71,7 @@ class Dataset(object):
 
   def available_subsets(self):
     """Returns the list of available subsets."""
-    return ['train', 'validation']
+    return ['train', 'validation', 'predict']
 
   def data_files(self):
     """Returns a python list of all (sharded) data subset files.
@@ -91,6 +91,7 @@ class Dataset(object):
       self.download_message()
       exit(-1)
     return data_files
+
 
   def reader(self):
     """Return a reader for a single entry from the data set.

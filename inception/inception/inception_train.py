@@ -48,11 +48,11 @@ tf.app.flags.DEFINE_boolean('log_device_placement', False,
                             """Whether to log device placement.""")
 
 # Flags governing the type of training.
-tf.app.flags.DEFINE_boolean('fine_tune', False,
+tf.app.flags.DEFINE_boolean('fine_tune', True,
                             """If set, randomly initialize the final layer """
                             """of weights in order to train the network on a """
                             """new task.""")
-tf.app.flags.DEFINE_string('pretrained_model_checkpoint_path', '',
+tf.app.flags.DEFINE_string('pretrained_model_checkpoint_path', '/home/ubuntu/pretrained_model/inception-v3/model.ckpt-157585',
                            """If specified, restore this pretrained model """
                            """before beginning any training.""")
 
@@ -204,6 +204,7 @@ def train(dataset):
                                     epsilon=RMSPROP_EPSILON)
 
     # Get images and labels for ImageNet and split the batch across GPUs.
+    print('FLAGS.batch_size' + str(FLAGS.batch_size))
     assert FLAGS.batch_size % FLAGS.num_gpus == 0, (
         'Batch size must be divisible by number of GPUs')
     split_batch_size = int(FLAGS.batch_size / FLAGS.num_gpus)
@@ -219,7 +220,8 @@ def train(dataset):
 
     # Number of classes in the Dataset label set plus 1.
     # Label 0 is reserved for an (unused) background class.
-    num_classes = dataset.num_classes() + 1
+    #num_classes = dataset.num_classes() + 1
+    num_classes = dataset.num_classes()
     
      # Split the batch of images and labels for towers.
     images_splits = tf.split(0, FLAGS.num_gpus, images)
