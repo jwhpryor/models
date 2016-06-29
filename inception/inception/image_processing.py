@@ -44,7 +44,7 @@ import tensorflow as tf
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_integer('batch_size', 1,
+tf.app.flags.DEFINE_integer('batch_size', 128,
                             """Number of images to process in a batch.""")
 tf.app.flags.DEFINE_integer('image_size', 299,
                             """Provide square images of this size.""")
@@ -64,7 +64,7 @@ tf.app.flags.DEFINE_integer('num_readers', 1,
 # of 1024*16 images. Assuming RGB 299x299 images, this implies a queue size of
 # 16GB. If the machine is memory limited, then decrease this factor to
 # decrease the CPU memory footprint, accordingly.
-tf.app.flags.DEFINE_integer('input_queue_memory_factor', 4,
+tf.app.flags.DEFINE_integer('input_queue_memory_factor', 2,
                             """Size of the queue of preprocessed images. """
                             """Default is ideal but try smaller values, e.g. """
                             """4, 2 or 1, if host memory is constrained. See """
@@ -234,9 +234,9 @@ def distort_image(image, height, width, bbox, thread_id=0, scope=None):
     sample_distorted_bounding_box = tf.image.sample_distorted_bounding_box(
         tf.shape(image),
         bounding_boxes=bbox,
-        min_object_covered=0.1,
+        min_object_covered=0.7,
         aspect_ratio_range=[0.75, 1.33],
-        area_range=[0.05, 1.0],
+        area_range=[0.75, 1.0],
         max_attempts=100,
         use_image_if_no_bounding_boxes=True)
     bbox_begin, bbox_size, distort_bbox = sample_distorted_bounding_box
@@ -264,7 +264,7 @@ def distort_image(image, height, width, bbox, thread_id=0, scope=None):
                        tf.expand_dims(distorted_image, 0))
 
     # Randomly flip the image horizontally.
-    distorted_image = tf.image.random_flip_left_right(distorted_image)
+    #distorted_image = tf.image.random_flip_left_right(distorted_image)
 
     # Randomly distort the colors.
     distorted_image = distort_color(distorted_image, thread_id)

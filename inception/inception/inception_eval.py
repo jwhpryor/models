@@ -29,6 +29,7 @@ import tensorflow as tf
 
 from inception import image_processing
 from inception import inception_model as inception
+from inception import kg_data
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -36,7 +37,7 @@ tf.app.flags.DEFINE_string('eval_dir', '/tmp/imagenet_eval',
                            """Directory where to write event logs.""")
 tf.app.flags.DEFINE_string('predict_dir', '/tmp/imagenet_predict',
                            """Directory where to write predictions.""")
-tf.app.flags.DEFINE_string('checkpoint_dir', '/home/ubuntu/checkpoints/accelerated_learning',
+tf.app.flags.DEFINE_string('checkpoint_dir', '/tmp/imagenet_train',
                            """Directory where to read model checkpoints.""")
 
 # Flags governing the frequency of the eval.
@@ -46,7 +47,7 @@ tf.app.flags.DEFINE_boolean('run_once', False,
                             """Whether to run eval only once.""")
 
 # Flags governing the data used for the eval.
-tf.app.flags.DEFINE_integer('num_examples', 50000,
+tf.app.flags.DEFINE_integer('num_examples', kg_data.NUM_EVAL_SAMPLES,
                             """Number of examples to run. Note that the eval """
                             """ImageNet dataset contains 50000 examples.""")
 tf.app.flags.DEFINE_string('subset', 'validation',
@@ -234,7 +235,8 @@ def evaluate(dataset):
 
     # Number of classes in the Dataset label set plus 1.
     # Label 0 is reserved for an (unused) background class.
-    num_classes = dataset.num_classes() + 1
+    #num_classes = dataset.num_classes() + 1
+    num_classes = dataset.num_classes()
 
     # Build a Graph that computes the logits predictions from the
     # inference model.
