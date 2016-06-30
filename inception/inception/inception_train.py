@@ -29,6 +29,7 @@ import tensorflow as tf
 
 from inception import image_processing
 from inception import inception_model as inception
+from inception import inception_eval as eval
 from inception.slim import slim
 
 FLAGS = tf.app.flags.FLAGS
@@ -38,20 +39,23 @@ tf.app.flags.DEFINE_string('train_dir', '/tmp/imagenet_train',
                            """and checkpoint.""")
 tf.app.flags.DEFINE_integer('max_steps', 10000000,
                             """Number of batches to run.""")
-tf.app.flags.DEFINE_string('subset', 'train',
-                           """Either 'train' or 'validation'.""")
+tf.app.flags.DEFINE_integer('num_validate_precision_iters', 5,
+                            """Number of batches to validate with.""")
 
 # Flags governing the hardware employed for running TensorFlow.
 tf.app.flags.DEFINE_integer('num_gpus', 4,
                             """How many GPUs to use.""")
 tf.app.flags.DEFINE_boolean('log_device_placement', False,
                             """Whether to log device placement.""")
+tf.app.flags.DEFINE_float('per_process_gpu_mem', 1.0,
+                            """Percent of memory to allocate per gpu.""")
 
 # Flags governing the type of training.
 tf.app.flags.DEFINE_boolean('fine_tune', False,
                             """If set, randomly initialize the final layer """
                             """of weights in order to train the network on a """
                             """new task.""")
+#tf.app.flags.DEFINE_string('pretrained_model_checkpoint_path', '/home/ubuntu/checkpoints/retrain_model_third/model.ckpt-3000',
 tf.app.flags.DEFINE_string('pretrained_model_checkpoint_path', '/home/ubuntu/pretrained_model/inception-v3/model.ckpt-157585',
                            """If specified, restore this pretrained model """
                            """before beginning any training.""")
@@ -66,7 +70,7 @@ tf.app.flags.DEFINE_string('pretrained_model_checkpoint_path', '/home/ubuntu/pre
 # With 8 Tesla K40's and a batch size = 256, the following setup achieves
 # precision@1 = 73.5% after 100 hours and 100K steps (20 epochs).
 # Learning rate decay factor selected from http://arxiv.org/abs/1404.5997.
-tf.app.flags.DEFINE_float('initial_learning_rate', 0.3,
+tf.app.flags.DEFINE_float('initial_learning_rate', 0.03,
                           """Initial learning rate.""")
 tf.app.flags.DEFINE_float('num_epochs_per_decay', 30.0,
                           """Epochs after which learning rate decays.""")
@@ -176,8 +180,7 @@ def _average_gradients(tower_grads):
     average_grads.append(grad_and_var)
   return average_grads
 
-
-def train(dataset):
+def train(dataset, validation_dataset):
   """Train on dataset for a number of steps."""
   with tf.Graph().as_default(), tf.device('/cpu:0'):
     # Create a variable to count the number of train() calls. This equals the
@@ -204,7 +207,6 @@ def train(dataset):
                                     epsilon=RMSPROP_EPSILON)
 
     # Get images and labels for ImageNet and split the batch across GPUs.
-    print('FLAGS.batch_size' + str(FLAGS.batch_size))
     assert FLAGS.batch_size % FLAGS.num_gpus == 0, (
         'Batch size must be divisible by number of GPUs')
     split_batch_size = int(FLAGS.batch_size / FLAGS.num_gpus)
@@ -303,6 +305,20 @@ def train(dataset):
     # Create a saver.
     saver = tf.train.Saver(tf.all_variables())
 
+    # Create a validation step
+    validation_top_1_op, validation_top_5_op = eval.evaluate_op(validation_dataset)
+    count_1_op = tf.reduce_sum(tf.to_int32(validation_top_1_op))
+    count_5_op = tf.reduce_sum(tf.to_int32(validation_top_5_op))
+
+    num_vals = FLAGS.batch_size * FLAGS.num_validate_precision_iters
+    precision_1_op = tf.truediv(count_1_op, tf.constant(FLAGS.batch_size))
+    #precision_1_op = tf.truediv(count_1_op, tf.constant(num_vals))
+    precision_5_op = tf.truediv(count_5_op, tf.constant(FLAGS.batch_size))
+    #precision_5_op = tf.truediv(count_5_op, tf.constant(num_vals))
+
+    summaries.append(tf.scalar_summary('validation precision @1', precision_1_op))
+    summaries.append(tf.scalar_summary('validation precision @51', precision_5_op))
+
     # Build the summary operation from the last tower summaries.
     summary_op = tf.merge_summary(summaries)
 
@@ -312,9 +328,12 @@ def train(dataset):
     # Start running operations on the Graph. allow_soft_placement must be set to
     # True to build towers on GPU, as some of the ops do not have GPU
     # implementations.
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=FLAGS.per_process_gpu_mem)
     sess = tf.Session(config=tf.ConfigProto(
         allow_soft_placement=True,
-        log_device_placement=FLAGS.log_device_placement))
+        log_device_placement=FLAGS.log_device_placement,
+
+    ))
     sess.run(init)
 
     if FLAGS.pretrained_model_checkpoint_path:
@@ -338,6 +357,7 @@ def train(dataset):
       _, loss_value = sess.run([train_op, loss])
       duration = time.time() - start_time
 
+
       assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
 
       if step % 10 == 0:
@@ -346,6 +366,28 @@ def train(dataset):
                       'sec/batch)')
         print(format_str % (datetime.now(), step, loss_value,
                             examples_per_sec, duration))
+
+        num_iters = FLAGS.num_validate_precision_iters
+        total_sample_count = num_iters * FLAGS.batch_size
+        count_top_1 = 0
+        count_top_5 = 0
+        prec_from_op_1 = 0
+        prec_from_op_5 = 0
+
+        for i in range(5):
+            top_1, top_5, prec_1, prec_5 = sess.run([validation_top_1_op, validation_top_5_op, precision_1_op, precision_5_op])
+            count_top_1 += np.sum(top_1)
+            count_top_5 += np.sum(top_5)
+            prec_from_op_1  += prec_1
+            prec_from_op_5  += prec_5
+
+        prec_from_op_1 /= 5
+        prec_from_op_5 /= 5
+        precision_1 = count_top_1 / total_sample_count
+        precision_5 = count_top_5 / total_sample_count
+
+        print('Evaluating precision...  precision@1:' + str(precision_1) + ' precision@5:' + str(precision_5))
+        print('CHECK...  prec@1:' + str(prec_from_op_1) + ' precision@5:' + str(prec_from_op_5))
 
       if step % 100 == 0:
         print('Writing summary...')

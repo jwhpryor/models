@@ -202,7 +202,8 @@ def predict(dataset):
 
     # Number of classes in the Dataset label set plus 1.
     # Label 0 is reserved for an (unused) background class.
-    num_classes = dataset.num_classes() + 1
+    #num_classes = dataset.num_classes() + 1
+    num_classes = dataset.num_classes() 
 
     # Build a Graph that computes the logits predictions from the
     # inference model.
@@ -227,9 +228,7 @@ def predict(dataset):
 
     _predict_once(saver, summary_writer, filenames, logits, summary_op)
 
-def evaluate(dataset):
-  """Evaluate model on Dataset for a number of steps."""
-  with tf.Graph().as_default():
+def evaluate_op(dataset):
     # Get images and labels from the dataset.
     images, labels, _ = image_processing.inputs(dataset)
 
@@ -246,9 +245,16 @@ def evaluate(dataset):
     top_1_op = tf.nn.in_top_k(logits, labels, 1)
     top_5_op = tf.nn.in_top_k(logits, labels, 5)
 
+    return top_1_op, top_5_op
+
+def evaluate(dataset):
+  """Evaluate model on Dataset for a number of steps."""
+  with tf.Graph().as_default():
+    top_1_op, top_5_op = evaluate_op(dataset)
+
     # Restore the moving average version of the learned variables for eval.
     variable_averages = tf.train.ExponentialMovingAverage(
-        inception.MOVING_AVERAGE_DECAY)
+      inception.MOVING_AVERAGE_DECAY)
     variables_to_restore = variable_averages.variables_to_restore()
     saver = tf.train.Saver(variables_to_restore)
 
@@ -256,11 +262,6 @@ def evaluate(dataset):
     summary_op = tf.merge_all_summaries()
 
     graph_def = tf.get_default_graph().as_graph_def()
-    summary_writer = tf.train.SummaryWriter(FLAGS.eval_dir,
-                                            graph_def=graph_def)
+    summary_writer = tf.train.SummaryWriter(FLAGS.eval_dir, graph_def=graph_def)
 
-    while True:
-      _eval_once(saver, summary_writer, top_1_op, top_5_op, summary_op)
-      if FLAGS.run_once:
-        break
-      time.sleep(FLAGS.eval_interval_secs)
+    _eval_once(saver, summary_writer, top_1_op, top_5_op, summary_op)

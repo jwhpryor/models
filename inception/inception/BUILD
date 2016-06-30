@@ -137,6 +137,7 @@ py_library(
     name = "inception_train",
     srcs = [
         "inception_train.py",
+        "inception_eval.py",
     ],
     deps = [
         ":image_processing",
