@@ -22,7 +22,7 @@ from datetime import datetime
 import math
 import os.path
 import time
-
+import csv
 
 import numpy as np
 import tensorflow as tf
@@ -53,6 +53,9 @@ tf.app.flags.DEFINE_integer('num_examples', kg_data.NUM_EVAL_SAMPLES,
 tf.app.flags.DEFINE_string('subset', 'validation',
                            """Either 'validation' or 'train'.""")
 
+# Flags govering where predictions are written
+tf.app.flags.DEFINE_string('prediction_output', '/tmp/imagenet_predict/predictions.csv',
+                           """The location where predictions should be written'.""")
 
 def _eval_once(saver, summary_writer, top_1_op, top_5_op, summary_op):
   """Runs Eval once.
@@ -134,7 +137,34 @@ def _eval_once(saver, summary_writer, top_1_op, top_5_op, summary_op):
     coord.request_stop()
     coord.join(threads, stop_grace_period_secs=10)
 
-def _predict_once(saver, summary_writer, filename_op, logits_op, summary_op):
+def write_predictions(predictions):
+  print('Writing ' + str(len(predictions)) + ' predictions...')
+  f = open(FLAGS.prediction_output, 'wt')
+  filename_observed_hack = set()
+  try:
+    writer = csv.writer(f)
+    writer.writerow(('img','c0','c1','c2','c3','c4','c5','c6','c7','c8','c9'))
+    for p in predictions:
+      filename = p[0]
+      logit = p[1]
+
+      # normalize (should do this in tensorflow)
+      max = np.max(logit)
+      min = np.min(logit)
+      range = max - min
+      logit = np.subtract(logit, min)
+      logit = np.divide(logit, range)
+
+      if not filename in filename_observed_hack:
+        filename_observed_hack.add(filename)
+      else:
+        # because of my batching I might see duplicates this hack avoids
+        continue
+      writer.writerow([filename] + logit.tolist())
+  finally:
+    f.close()
+
+def _predict_once(saver, filename_op, logits_op):
   """Runs Eval once.
 
   Args:
@@ -145,6 +175,7 @@ def _predict_once(saver, summary_writer, filename_op, logits_op, summary_op):
     summary_op: Summary op.
   """
   with tf.Session() as sess:
+    # restore checkpoint
     ckpt = tf.train.get_checkpoint_state(FLAGS.checkpoint_dir)
     if ckpt and ckpt.model_checkpoint_path:
       if os.path.isabs(ckpt.model_checkpoint_path):
@@ -155,9 +186,6 @@ def _predict_once(saver, summary_writer, filename_op, logits_op, summary_op):
         saver.restore(sess, os.path.join(FLAGS.checkpoint_dir,
                                          ckpt.model_checkpoint_path))
 
-      # Assuming model_checkpoint_path looks something like:
-      #   /my-favorite-path/imagenet_train/model.ckpt-0,
-      # extract global_step from it.
       global_step = ckpt.model_checkpoint_path.split('/')[-1].split('-')[-1]
       print('Succesfully loaded model from %s at step=%s.' %
             (ckpt.model_checkpoint_path, global_step))
@@ -173,26 +201,29 @@ def _predict_once(saver, summary_writer, filename_op, logits_op, summary_op):
         threads.extend(qr.create_threads(sess, coord=coord, daemon=True,
                                          start=True))
 
-      num_iter = int(math.ceil(FLAGS.num_examples / FLAGS.batch_size))
-      # Counts the number of correct predictions.
-      count_top_1 = 0.0
-      count_top_5 = 0.0
-      total_sample_count = num_iter * FLAGS.batch_size
+      #num_iter = int(math.ceil(FLAGS.num_examples / FLAGS.batch_size))
+      num_iter = int(math.ceil(kg_data.NUM_PREDICT_SAMPLES / FLAGS.batch_size))
       step = 0
 
-
+      # Run predictions
       print('%s: starting prediction on (%s).' % (datetime.now(), FLAGS.subset))
-      start_time = time.time()
+      predictions = []
       while step < num_iter and not coord.should_stop():
         filenames, logits = sess.run([filename_op, logits_op])
         for filename, logit in zip(filenames, logits):
-          print(filename + ":" + str(logit))
+          predictions.append((filename, logit))
+        step += 1
 
     except Exception as e:  # pylint: disable=broad-except
       coord.request_stop(e)
 
-    coord.request_stop()
-    coord.join(threads, stop_grace_period_secs=10)
+    try:
+        coord.request_stop()
+        coord.join(threads, stop_grace_period_secs=10)
+    except Exception as e:
+        print('Ignoring e: ' + str(e))
+
+    write_predictions(predictions)
 
 def predict(dataset):
   """Evaluate model on Dataset for a number of steps."""
@@ -202,16 +233,11 @@ def predict(dataset):
 
     # Number of classes in the Dataset label set plus 1.
     # Label 0 is reserved for an (unused) background class.
-    #num_classes = dataset.num_classes() + 1
-    num_classes = dataset.num_classes() 
+    num_classes = dataset.num_classes()
 
     # Build a Graph that computes the logits predictions from the
     # inference model.
     logits, _ = inception.inference(images, num_classes)
-
-    # Calculate predictions.
-    #top_1_op = tf.nn.in_top_k(logits, labels, 1)
-    #top_5_op = tf.nn.in_top_k(logits, labels, 5)
 
     # Restore the moving average version of the learned variables for eval.
     variable_averages = tf.train.ExponentialMovingAverage(
@@ -219,14 +245,7 @@ def predict(dataset):
     variables_to_restore = variable_averages.variables_to_restore()
     saver = tf.train.Saver(variables_to_restore)
 
-    # Build the summary operation based on the TF collection of Summaries.
-    summary_op = tf.merge_all_summaries()
-
-    graph_def = tf.get_default_graph().as_graph_def()
-    summary_writer = tf.train.SummaryWriter(FLAGS.eval_dir,
-                                            graph_def=graph_def)
-
-    _predict_once(saver, summary_writer, filenames, logits, summary_op)
+    _predict_once(saver, filenames, logits)
 
 def evaluate_op(dataset):
     # Get images and labels from the dataset.

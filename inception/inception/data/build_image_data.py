@@ -72,7 +72,7 @@ import random
 import sys
 import threading
 
-import kg_data
+from inception import kg_data
 from inception import image_processing
 
 import numpy as np
