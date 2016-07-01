@@ -137,6 +137,9 @@ def _eval_once(saver, summary_writer, top_1_op, top_5_op, summary_op):
     coord.request_stop()
     coord.join(threads, stop_grace_period_secs=10)
 
+def top_k(a, N):
+  return np.argsort(a)[::-1][:N]
+
 def write_predictions(predictions):
   print('Writing ' + str(len(predictions)) + ' predictions...')
   f = open(FLAGS.prediction_output, 'wt')
@@ -148,19 +151,29 @@ def write_predictions(predictions):
       filename = p[0]
       logit = p[1]
 
-      # normalize (should do this in tensorflow)
-      max = np.max(logit)
-      min = np.min(logit)
-      range = max - min
-      logit = np.subtract(logit, min)
-      logit = np.divide(logit, range)
+      # dont know how to do this with numpy properly
+      top_idx = top_k(logit, 3)
+      logit_mod = [0 for x in logit]
+      for i in xrange(len(logit)):
+        if i in top_idx:
+         logit_mod[i] = logit[i]
+      #logit = logit_mod
 
+      # normalize (should do this in tensorflow)
+      max = np.max(logit_mod)
+      min = np.min(logit_mod)
+      range = max - min
+      logit_mod = np.subtract(logit_mod, min)
+      logit_mod = np.divide(logit_mod, range)
+
+      # because of my batching I might see duplicates this hack avoids
       if not filename in filename_observed_hack:
         filename_observed_hack.add(filename)
       else:
-        # because of my batching I might see duplicates this hack avoids
         continue
-      writer.writerow([filename] + logit.tolist())
+
+      #writer.writerow([filename] + logit.tolist())
+      writer.writerow([filename] + logit_mod)
   finally:
     f.close()
 
@@ -208,9 +221,17 @@ def _predict_once(saver, filename_op, logits_op):
       # Run predictions
       print('%s: starting prediction on (%s).' % (datetime.now(), FLAGS.subset))
       predictions = []
+
+      ########################################
+      #num_iter = 1
+
       while step < num_iter and not coord.should_stop():
+        if step % 10 == 0:
+            print('step ' + str(step) + ' of ' + str(num_iter))
+
         filenames, logits = sess.run([filename_op, logits_op])
         for filename, logit in zip(filenames, logits):
+          #print(filename + ":" + str(logit))
           predictions.append((filename, logit))
         step += 1
 
